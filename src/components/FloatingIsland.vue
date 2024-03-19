@@ -1,10 +1,5 @@
 <template>
-    <div v-show="isLoading" class="loading-overlay">
-        <div class="loader">
-            <img src="../assets/magic_circle.png" class="magic-circle" alt="Magic Circle" />
-            <p>Loading enchantments...</p>
-        </div>
-    </div>
+    <LoadingPage v-if="isLoading" />
     <div v-show="showWelcomeMessage" @click="closeMessageButton">
         <WelcomeMessage />
     </div>
@@ -38,6 +33,7 @@ import AboutMe from '../pages/AboutMe.vue';
 import ContactMe from '../pages/ContactMe.vue';
 import ProjectAndExperience from '../pages/ProjectAndExperience.vue';
 import WelcomeMessage from '../pages/WelcomeMessage.vue';
+import LoadingPage from '../pages/LoadingPage.vue';
 import { initializeScene } from '../utils/sceneInit';
 
 const showWelcomeMessage = ref(false);
@@ -58,12 +54,20 @@ const isScrollLabelVisible = ref(false);
 let scene = new THREE.Scene();
 let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 let renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.shadowMap.enabled = true; // Enable shadows in the renderer
+renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 let island;
 let islandTopY;
 let controls;
 let models;
+let baseScaleX = 80;
+let baseScaleY = 80;
+let baseScaleZ = 60;
+let scaleFactor = 1.0;
+let scalingSpeed = 0.005;
+let maxScale = 1.3;
+let minScale = 0.9;
+
 onMounted(async () => {
     initScene();
     console.log(window.innerWidth, window.innerHeight);
@@ -85,11 +89,64 @@ onMounted(async () => {
 
     window.addEventListener('resize', onWindowResize, false);
 
+    window.addEventListener('mousedown', onScrollClick, false);
+    window.addEventListener('touchstart', handleTouchEvent, false);
 });
 
 onUnmounted(() => {
     window.removeEventListener('resize', onWindowResize, false);
 });
+
+function handleTouchEvent(event) {
+    if (isOverlayVisible.value || showWelcomeMessage.value) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
+    event.preventDefault();
+    console.log('Touch event received');
+    if (event.touches && event.touches.length > 0) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const clientX = event.touches[0].clientX - rect.left;
+        const clientY = event.touches[0].clientY - rect.top;
+        console.log(`Corrected touch coordinates: X = ${clientX}, Y = ${clientY}`);
+
+        const mouse = new THREE.Vector2();
+        mouse.x = ((clientX / rect.width) * 2 - 1);
+        mouse.y = (-(clientY / rect.height) * 2 + 1);
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects([models.scroll, models.scroll2, models.scroll3].filter(Boolean));
+        console.log('Intersections found:', intersects.length);
+
+        console.log('Intersections found:', intersects.length);
+        if (intersects.length > 0) {
+            let intersected = intersects[0].object;
+            console.log('Intersected object:', intersected);
+
+            while (intersected && !Object.values(models).includes(intersected) && intersected.parent) {
+                intersected = intersected.parent;
+            }
+
+            if (intersected === models.scroll) {
+                console.log('Intersected models.scroll');
+                currentComponent.value = AboutMe;
+            } else if (intersected === models.scroll2) {
+                console.log('Intersected models.scroll2');
+                currentComponent.value = ContactMe;
+            } else if (intersected === models.scroll3) {
+                console.log('Intersected models.scroll3');
+                currentComponent.value = ProjectAndExperience;
+            }
+
+            if (intersected) {
+                isOverlayVisible.value = true;
+                isScrollLabelVisible.value = false;
+            }
+        }
+    }
+}
 function closeMessageButton() {
     showWelcomeMessage.value = false;
     isScrollLabelVisible.value = true;
@@ -151,6 +208,21 @@ function setupLights() {
 
 function animate() {
     requestAnimationFrame(animate);
+    if (models && models.scroll && models.scroll2 && models.scroll3) {
+        if (scaleFactor >= maxScale || scaleFactor <= minScale) {
+            scalingSpeed = -scalingSpeed;  // Reverse direction at extremes
+        }
+        scaleFactor += scalingSpeed;
+        models.scroll.scale.set(baseScaleX * scaleFactor,
+            baseScaleY * scaleFactor,
+            baseScaleZ * scaleFactor);
+        models.scroll2.scale.set(baseScaleX * scaleFactor,
+            baseScaleY * scaleFactor,
+            baseScaleZ * scaleFactor);
+        models.scroll3.scale.set(baseScaleX * scaleFactor,
+            baseScaleY * scaleFactor,
+            baseScaleZ * scaleFactor);
+    }
 
     if (models && models.scroll && scroll1Label.value) {
         updateScrollLabelPosition(models.scroll, scroll1Label, showScroll1Label);
@@ -190,13 +262,19 @@ function onScrollClick(event) {
         event.stopPropagation();
         return;
     }
-    event.preventDefault();
-    let mouse = new THREE.Vector2();
-    let raycaster = new THREE.Raycaster();
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
+    let clientX = event.clientX;
+    let clientY = event.clientY;
 
+    if (event.changedTouches && event.changedTouches.length > 0) {
+        clientX = event.changedTouches[0].clientX;
+        clientY = event.changedTouches[0].clientY;
+    }
+    let mouse = new THREE.Vector2();
+    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+    let raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
     let intersects = raycaster.intersectObjects([models.scroll, models.scroll2, models.scroll3]);
 
     if (intersects.length > 0) {
@@ -257,7 +335,6 @@ function loadIslandModel() {
     });
 }
 
-window.addEventListener('mousedown', onScrollClick, false);
 </script>
 
 <style>
@@ -266,15 +343,21 @@ window.addEventListener('mousedown', onScrollClick, false);
 
 .scroll-label {
     position: absolute;
-    background: rgba(28, 20, 64, 0.9);
-    color: #f8e9a1;
-    padding: 14px 18px;
-    border-radius: 10px;
-    pointer-events: none;
+    color: #2a1842;
+    padding: 10px 16px;
     font-family: 'Tangerine', cursive;
-    font-size: 1.5em;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
-    border: 1px solid #897bac;
+    font-size: 1.8em;
+    text-shadow: 1px 1px 5px rgba(255, 255, 255, 0.8);
+    border: none;
+    transform: translate(-50%, -50%);
+    top: 50%;
+    left: 50%;
+    transition: transform 0.3s ease, text-shadow 0.3s ease;
+}
+
+.scroll-label:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+    text-shadow: 2px 2px 10px rgba(255, 255, 255, 1);
 }
 
 .scroll-label * {
@@ -337,46 +420,6 @@ window.addEventListener('mousedown', onScrollClick, false);
     .close-button {
         /* Adjustments for small screens */
         font-size: clamp(1em, 4vw, 1.5em);
-    }
-}
-
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #000;
-    color: #fff;
-}
-
-.loader {
-    text-align: center;
-}
-
-.loader p {
-    color: #f8e9a1;
-    font-family: 'Tangerine', cursive;
-    font-size: 2em;
-    margin-top: 20px;
-}
-
-.magic-circle {
-    width: 150px;
-    height: 150px;
-    animation: spin 5s linear infinite;
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
     }
 }
 </style>
