@@ -39,7 +39,7 @@ export function scrollModel(scene) {
             object.receiveShadow = true;
           }
         });
-        scrollModel.scale.set(80, 60, 60);
+        scrollModel.scale.set(80, 80, 60);
         scene.add(scrollModel);
         resolve(scrollModel);
       },

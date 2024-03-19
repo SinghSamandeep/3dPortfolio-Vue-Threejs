@@ -15,7 +15,7 @@
                 <li>GitHub: <a href="https://github.com/SinghSamandeep" target="_blank"
                         @click="testNavigation">github.com/SinghSamandeep</a>
                 </li>
-                <li>CV: <a href="../resume/samandeep_resume.pdf" target="_blank" @click="testNavigation">CHECK MY CV</a>
+                <li>CV: <a href="./samandeep_resume.pdf" target="_blank" @click="testNavigation">CHECK MY CV</a>
                 </li>
             </ul>
         </div>
@@ -25,10 +25,7 @@
 <script setup>
 import { ref } from 'vue';
 const testNavigation = (event) => {
-    // Prevent the default link behavior for diagnostic purposes
     event.preventDefault();
-    console.log('Link clicked:', event.target.href);
-    // Explicitly open the URL in a new tab
     window.open(event.target.href, '_blank');
 };
 
